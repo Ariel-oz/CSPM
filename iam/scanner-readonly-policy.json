@@ -1,0 +1,147 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ACCESS-ANALYZERREADONLY",
+      "Effect": "Allow",
+      "Action": [
+        "access-analyzer:ListAnalyzers"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "ACCOUNTREADONLY",
+      "Effect": "Allow",
+      "Action": [
+        "account:GetAlternateContact"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "CLOUDTRAILREADONLY",
+      "Effect": "Allow",
+      "Action": [
+        "cloudtrail:DescribeTrails",
+        "cloudtrail:GetEventSelectors",
+        "cloudtrail:GetTrailStatus"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "CONFIGREADONLY",
+      "Effect": "Allow",
+      "Action": [
+        "config:DescribeConfigurationRecorderStatus",
+        "config:DescribeConfigurationRecorders"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "EC2READONLY",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:DescribeFlowLogs",
+        "ec2:DescribeInstances",
+        "ec2:DescribeNetworkAcls",
+        "ec2:DescribeRegions",
+        "ec2:DescribeSecurityGroups",
+        "ec2:DescribeVolumes",
+        "ec2:DescribeVpcs"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "ELASTICFILESYSTEMREADONLY",
+      "Effect": "Allow",
+      "Action": [
+        "elasticfilesystem:DescribeFileSystems"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "GUARDDUTYREADONLY",
+      "Effect": "Allow",
+      "Action": [
+        "guardduty:GetDetector",
+        "guardduty:ListDetectors"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "IAMREADONLY",
+      "Effect": "Allow",
+      "Action": [
+        "iam:GenerateCredentialReport",
+        "iam:GetAccountAuthorizationDetails",
+        "iam:GetAccountPasswordPolicy",
+        "iam:GetAccountSummary",
+        "iam:GetCredentialReport",
+        "iam:ListAttachedRolePolicies",
+        "iam:ListEntitiesForPolicy",
+        "iam:ListRoles",
+        "iam:ListServerCertificates",
+        "iam:ListVirtualMFADevices"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "KMSREADONLY",
+      "Effect": "Allow",
+      "Action": [
+        "kms:DescribeKey",
+        "kms:GetKeyRotationStatus",
+        "kms:ListKeys"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "MACIE2READONLY",
+      "Effect": "Allow",
+      "Action": [
+        "macie2:GetMacieSession"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "RDSREADONLY",
+      "Effect": "Allow",
+      "Action": [
+        "rds:DescribeDBInstances"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "S3READONLY",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetAccountPublicAccessBlock",
+        "s3:GetBucketAcl",
+        "s3:GetBucketLocation",
+        "s3:GetBucketLogging",
+        "s3:GetBucketPolicy",
+        "s3:GetBucketPolicyStatus",
+        "s3:GetBucketPublicAccessBlock",
+        "s3:GetBucketVersioning",
+        "s3:GetEncryptionConfiguration",
+        "s3:ListAllMyBuckets"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "SECURITYHUBREADONLY",
+      "Effect": "Allow",
+      "Action": [
+        "securityhub:DescribeHub"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "STSREADONLY",
+      "Effect": "Allow",
+      "Action": [
+        "sts:GetCallerIdentity"
+      ],
+      "Resource": "*"
+    }
+  ]
+}

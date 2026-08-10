@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>CSPM Scan Report - {{ account_id }}</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #0f1115; --panel: #171a21; --border: #2a2e37; --text: #e6e8ec; --muted: #9aa2af;
+    --pass: #2fa84f; --fail: #d64545; --error: #d6a445; --na: #6b7280;
+  }
+  @media (prefers-color-scheme: light) {
+    :root { --bg: #f5f6f8; --panel: #ffffff; --border: #dde1e6; --text: #14161a; --muted: #5b6270; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); }
+  header { padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border); }
+  header h1 { margin: 0 0 0.25rem; font-size: 1.25rem; }
+  header .meta { color: var(--muted); font-size: 0.85rem; }
+  main { max-width: 100%; padding: 1.25rem 1.5rem; overflow-x: auto; }
+  .summary { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1.25rem; }
+  .chip { padding: 0.5rem 0.9rem; border-radius: 8px; border: 1px solid var(--border); background: var(--panel); font-size: 0.85rem; }
+  .chip b { font-size: 1rem; }
+  .chip.pass b { color: var(--pass); } .chip.fail b { color: var(--fail); }
+  .chip.error b { color: var(--error); } .chip.na b { color: var(--na); }
+  .filters { display: flex; flex-wrap: wrap; gap: 1.5rem; margin-bottom: 1.25rem; padding: 0.9rem; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); }
+  .filter-group { display: flex; flex-direction: column; gap: 0.35rem; }
+  .filter-group .label { font-size: 0.75rem; text-transform: uppercase; color: var(--muted); margin-bottom: 0.15rem; }
+  .filter-group label { font-size: 0.85rem; display: flex; align-items: center; gap: 0.35rem; cursor: pointer; }
+  .severity-group { margin-bottom: 1.5rem; }
+  .severity-group > h2 { font-size: 1rem; margin: 0 0 0.5rem; padding-bottom: 0.35rem; border-bottom: 1px solid var(--border); }
+  .service-group { margin-bottom: 1rem; }
+  .service-group > h3 { font-size: 0.85rem; color: var(--muted); margin: 0 0 0.5rem; text-transform: uppercase; letter-spacing: 0.03em; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.85rem; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  th, td { text-align: left; padding: 0.55rem 0.75rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; }
+  tr:last-child td { border-bottom: none; }
+  .status-badge { display: inline-block; padding: 0.15rem 0.55rem; border-radius: 999px; font-size: 0.72rem; font-weight: 600; }
+  .status-badge.pass { background: rgba(47,168,79,0.15); color: var(--pass); }
+  .status-badge.fail { background: rgba(214,69,69,0.15); color: var(--fail); }
+  .status-badge.error { background: rgba(214,164,69,0.18); color: var(--error); }
+  .status-badge.not_applicable { background: rgba(107,114,128,0.15); color: var(--na); }
+  .resource { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.8rem; word-break: break-all; }
+  .remediation { color: var(--muted); }
+  .error-code { font-family: ui-monospace, monospace; color: var(--error); }
+  .empty { color: var(--muted); padding: 2rem; text-align: center; }
+</style>
+</head>
+<body>
+<header>
+  <h1>AWS CSPM Scan Report</h1>
+  <div class="meta">
+    Account: {{ account_id }} &middot; Profile: {{ profile }} &middot; Generated: {{ generated_at }} &middot;
+    Regions: {{ regions | join(", ") }}
+  </div>
+</header>
+<main>
+  <div class="summary">
+    <div class="chip">Total <b>{{ total }}</b></div>
+    <div class="chip pass">Pass <b>{{ counts.get("pass", 0) }}</b></div>
+    <div class="chip fail">Fail <b>{{ counts.get("fail", 0) }}</b></div>
+    <div class="chip error">Errors <b>{{ counts.get("error", 0) }}</b></div>
+    <div class="chip na">N/A <b>{{ counts.get("not_applicable", 0) }}</b></div>
+    {% for sev, n in fail_by_severity.items() %}
+    <div class="chip fail">{{ sev }} fails <b>{{ n }}</b></div>
+    {% endfor %}
+  </div>
+
+  <div class="filters">
+    <div class="filter-group">
+      <span class="label">Status</span>
+      <div id="status-filters"></div>
+    </div>
+    <div class="filter-group">
+      <span class="label">Severity</span>
+      <div id="severity-filters"></div>
+    </div>
+    <div class="filter-group">
+      <span class="label">Service</span>
+      <div id="service-filters"></div>
+    </div>
+  </div>
+
+  <div id="report-root"></div>
+</main>
+
+<script type="application/json" id="findings-data">{{ findings_json | safe }}</script>
+<script>
+(function () {
+  var findings = JSON.parse(document.getElementById('findings-data').textContent);
+  var SEVERITY_ORDER = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFORMATIONAL"];
+
+  var state = {
+    status: new Set(["pass", "fail", "error", "not_applicable"]),
+    severity: new Set(SEVERITY_ORDER),
+    service: new Set(Array.from(new Set(findings.map(function (f) { return f.service; }))))
+  };
+
+  function el(tag, attrs, children) {
+    var e = document.createElement(tag);
+    for (var k in (attrs || {})) {
+      if (k === 'text') { e.textContent = attrs[k]; } else { e.setAttribute(k, attrs[k]); }
+    }
+    (children || []).forEach(function (c) { e.appendChild(c); });
+    return e;
+  }
+
+  function buildCheckboxGroup(container, values, stateSet, labelFn) {
+    values.forEach(function (v) {
+      var id = 'f-' + container.id + '-' + v;
+      var checkbox = el('input', { type: 'checkbox', id: id });
+      checkbox.checked = stateSet.has(v);
+      checkbox.addEventListener('change', function () {
+        if (checkbox.checked) { stateSet.add(v); } else { stateSet.delete(v); }
+        render();
+      });
+      var label = el('label', { for: id });
+      label.appendChild(checkbox);
+      label.appendChild(document.createTextNode(labelFn ? labelFn(v) : v));
+      container.appendChild(label);
+    });
+  }
+
+  buildCheckboxGroup(document.getElementById('status-filters'), ["pass", "fail", "error", "not_applicable"], state.status, function (v) { return v.toUpperCase(); });
+  buildCheckboxGroup(document.getElementById('severity-filters'), SEVERITY_ORDER, state.severity);
+  buildCheckboxGroup(document.getElementById('service-filters'), Array.from(state.service).sort(), state.service);
+
+  function render() {
+    var root = document.getElementById('report-root');
+    root.innerHTML = '';
+
+    var visible = findings.filter(function (f) {
+      return state.status.has(f.status) && state.severity.has(f.severity) && state.service.has(f.service);
+    });
+
+    if (visible.length === 0) {
+      root.appendChild(el('div', { class: 'empty', text: 'No findings match the current filters.' }));
+      return;
+    }
+
+    SEVERITY_ORDER.forEach(function (sev) {
+      var inSev = visible.filter(function (f) { return f.severity === sev; });
+      if (inSev.length === 0) return;
+
+      var sevGroup = el('div', { class: 'severity-group' });
+      sevGroup.appendChild(el('h2', { text: sev + ' (' + inSev.length + ')' }));
+
+      var services = Array.from(new Set(inSev.map(function (f) { return f.service; }))).sort();
+      services.forEach(function (svc) {
+        var inSvc = inSev.filter(function (f) { return f.service === svc; });
+        var svcGroup = el('div', { class: 'service-group' });
+        svcGroup.appendChild(el('h3', { text: svc }));
+
+        var table = el('table');
+        var thead = el('thead', {}, [el('tr', {}, [
+          el('th', { text: 'Check' }), el('th', { text: 'Resource' }), el('th', { text: 'Region' }),
+          el('th', { text: 'Status' }), el('th', { text: 'CIS' }), el('th', { text: 'Remediation' })
+        ])]);
+        table.appendChild(thead);
+        var tbody = el('tbody');
+        inSvc.forEach(function (f) {
+          var statusCell = el('td');
+          var badge = el('span', { class: 'status-badge ' + f.status, text: f.status.toUpperCase() });
+          statusCell.appendChild(badge);
+          if (f.status === 'error' && f.error_code) {
+            statusCell.appendChild(el('div', { class: 'error-code', text: f.error_code }));
+          }
+          var cisText = (f.cis_benchmarks && f.cis_benchmarks.length) ? f.cis_benchmarks.join(', ') : '—';
+          var row = el('tr', {}, [
+            el('td', {}, [el('div', { text: f.title }), el('div', { class: 'resource', text: f.check_id })]),
+            el('td', { class: 'resource', text: f.resource_id }),
+            el('td', { text: f.region }),
+            statusCell,
+            el('td', { class: 'resource', text: cisText }),
+            el('td', { class: 'remediation', text: f.remediation })
+          ]);
+          tbody.appendChild(row);
+        });
+        table.appendChild(tbody);
+        svcGroup.appendChild(table);
+        sevGroup.appendChild(svcGroup);
+      });
+
+      root.appendChild(sevGroup);
+    });
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>
