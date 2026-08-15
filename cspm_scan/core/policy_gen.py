@@ -10,14 +10,10 @@ from .registry import CHECK_REGISTRY
 # any single check, so they're not expressed via a CheckMeta.required_actions list.
 BASELINE_ACTIONS = ["sts:GetCallerIdentity", "ec2:DescribeRegions"]
 
-# Needed only by the optional --ai-summary feature (core/bedrock_summary.py), which isn't a
-# check either — it's a post-scan analysis step over the findings the checks already produced.
-AI_SUMMARY_ACTIONS = ["bedrock:InvokeModel"]
-
 
 def build_policy() -> dict:
     by_service: dict[str, set[str]] = {}
-    for action in BASELINE_ACTIONS + AI_SUMMARY_ACTIONS:
+    for action in BASELINE_ACTIONS:
         prefix = action.split(":")[0]
         by_service.setdefault(prefix, set()).add(action)
     for check in CHECK_REGISTRY.values():

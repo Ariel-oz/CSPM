@@ -1,5 +1,5 @@
 from cspm_scan.core.models import CheckMeta, Severity
-from cspm_scan.core.policy_gen import AI_SUMMARY_ACTIONS, BASELINE_ACTIONS, build_policy
+from cspm_scan.core.policy_gen import BASELINE_ACTIONS, build_policy
 from cspm_scan.core.registry import CHECK_REGISTRY, BaseCheck, register_check
 
 
@@ -32,9 +32,6 @@ def test_build_policy_includes_baseline_and_check_actions():
         assert "s3:GetBucketAcl" in sids["S3READONLY"]["Action"]
         assert "s3:GetBucketPolicy" in sids["S3READONLY"]["Action"]
         for action in BASELINE_ACTIONS:
-            prefix, _ = action.split(":")
-            assert action in sids[f"{prefix.upper()}READONLY"]["Action"]
-        for action in AI_SUMMARY_ACTIONS:
             prefix, _ = action.split(":")
             assert action in sids[f"{prefix.upper()}READONLY"]["Action"]
     finally:

@@ -23,13 +23,11 @@ def write_html_report(
     account_id: str | None,
     profile: str,
     regions: list[str],
-    ai_summary: dict | None = None,
 ) -> None:
     # `select_autoescape(["html"])` matches on the template's filename suffix, and this template
     # is named "report.html.j2" (suffix ".j2"), so that check silently evaluated to False and
     # autoescaping was never actually on. Force it on unconditionally instead — every server-side
-    # `{{ }}` in this template (account_id/profile/regions, and now LLM-produced ai_summary text)
-    # must be HTML-escaped.
+    # `{{ }}` in this template (account_id/profile/regions) must be HTML-escaped.
     env = Environment(loader=FileSystemLoader(str(TEMPLATE_DIR)), autoescape=True)
     template = env.get_template("report.html.j2")
 
@@ -47,7 +45,6 @@ def write_html_report(
         total=len(findings),
         counts=counts,
         fail_by_severity=fail_by_severity,
-        ai_summary=ai_summary,
         findings_json=_safe_json([f.to_dict() for f in findings]),
     )
 
