@@ -44,6 +44,16 @@
   .remediation { color: var(--muted); }
   .error-code { font-family: ui-monospace, monospace; color: var(--error); }
   .empty { color: var(--muted); padding: 2rem; text-align: center; }
+  .ai-summary { margin-bottom: 1.25rem; padding: 1rem 1.1rem; border: 1px solid var(--border); border-radius: 8px; background: var(--panel); }
+  .ai-summary h2 { font-size: 0.95rem; margin: 0 0 0.75rem; }
+  .ai-summary .urgent { padding: 0.85rem 1rem; margin-bottom: 0.9rem; border: 1px solid var(--fail); border-radius: 8px; background: rgba(214,69,69,0.08); }
+  .ai-summary .urgent .label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--fail); font-weight: 600; }
+  .ai-summary .urgent .title { font-size: 1rem; margin: 0.25rem 0; }
+  .ai-summary .urgent .meta { color: var(--muted); font-size: 0.8rem; margin-bottom: 0.4rem; }
+  .ai-summary .exec-summary { color: var(--text); font-size: 0.9rem; line-height: 1.5; margin-bottom: 0.9rem; }
+  .ai-summary ol { margin: 0; padding-left: 1.2rem; font-size: 0.85rem; }
+  .ai-summary ol li { margin-bottom: 0.5rem; }
+  .ai-summary ol .fix-meta { color: var(--muted); font-size: 0.78rem; }
 </style>
 </head>
 <body>
@@ -65,6 +75,30 @@
     <div class="chip fail">{{ sev }} fails <b>{{ n }}</b></div>
     {% endfor %}
   </div>
+
+  {% if ai_summary %}
+  <div class="ai-summary">
+    <h2>AI Priority Summary (AWS Bedrock)</h2>
+    <div class="urgent">
+      <div class="label">Most urgent fix</div>
+      <div class="title">{{ ai_summary.most_urgent_fix.title }}</div>
+      <div class="meta">{{ ai_summary.most_urgent_fix.check_id }} &middot; {{ ai_summary.most_urgent_fix.severity }}</div>
+      <div>{{ ai_summary.most_urgent_fix.reason }}</div>
+      <div class="remediation">{{ ai_summary.most_urgent_fix.remediation }}</div>
+    </div>
+    <div class="exec-summary">{{ ai_summary.executive_summary }}</div>
+    {% if ai_summary.prioritized_fixes %}
+    <ol>
+      {% for fix in ai_summary.prioritized_fixes %}
+      <li>
+        <div>{{ fix.title }} <span class="fix-meta">({{ fix.check_id }} &middot; {{ fix.severity }})</span></div>
+        <div class="fix-meta">{{ fix.reason }}</div>
+      </li>
+      {% endfor %}
+    </ol>
+    {% endif %}
+  </div>
+  {% endif %}
 
   <div class="filters">
     <div class="filter-group">

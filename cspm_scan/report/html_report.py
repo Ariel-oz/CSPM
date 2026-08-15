@@ -2,7 +2,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from jinja2 import Environment, FileSystemLoader, select_autoescape
+from jinja2 import Environment, FileSystemLoader
 
 from cspm_scan.core.models import Finding, Status
 
@@ -23,8 +23,14 @@ def write_html_report(
     account_id: str | None,
     profile: str,
     regions: list[str],
+    ai_summary: dict | None = None,
 ) -> None:
-    env = Environment(loader=FileSystemLoader(str(TEMPLATE_DIR)), autoescape=select_autoescape(["html"]))
+    # `select_autoescape(["html"])` matches on the template's filename suffix, and this template
+    # is named "report.html.j2" (suffix ".j2"), so that check silently evaluated to False and
+    # autoescaping was never actually on. Force it on unconditionally instead — every server-side
+    # `{{ }}` in this template (account_id/profile/regions, and now LLM-produced ai_summary text)
+    # must be HTML-escaped.
+    env = Environment(loader=FileSystemLoader(str(TEMPLATE_DIR)), autoescape=True)
     template = env.get_template("report.html.j2")
 
     counts = {s.value: sum(1 for f in findings if f.status == s) for s in Status}
@@ -41,6 +47,7 @@ def write_html_report(
         total=len(findings),
         counts=counts,
         fail_by_severity=fail_by_severity,
+        ai_summary=ai_summary,
         findings_json=_safe_json([f.to_dict() for f in findings]),
     )
 

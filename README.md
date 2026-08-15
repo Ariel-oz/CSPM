@@ -15,7 +15,9 @@ pip install -r requirements.txt
 
 Configure an AWS named profile (in `~/.aws/config` / `~/.aws/credentials`) with read-only
 access. `iam/scanner-readonly-policy.json` is a generated least-privilege policy containing
-exactly the actions the checks use — attach it to a dedicated scanner IAM user if you want
+exactly the actions the checks use, plus the small set of engine-level actions needed
+regardless of which checks run (auth/region-discovery, and `bedrock:InvokeModel` for the
+optional `--ai-summary` feature below) — attach it to a dedicated scanner IAM user if you want
 tighter permissions than whatever profile you're currently using.
 
 ## Usage
@@ -31,6 +33,39 @@ python -m cspm_scan --print-iam-policy --output iam/scanner-readonly-policy.json
 Findings use a 4-state status — `PASS`, `FAIL`, `ERROR`, `NOT_APPLICABLE` — instead of a plain
 pass/fail boolean. A missing IAM permission produces an `ERROR` finding (with the AWS error
 code attached), never a silent pass.
+
+## AI-powered priority summary (AWS Bedrock)
+
+```bash
+python -m cspm_scan --profile <profile> --formats table,json,html --ai-summary \
+    [--bedrock-model us.anthropic.claude-haiku-4-5-20251001-v1:0] [--bedrock-region us-east-1]
+```
+
+`--ai-summary` sends the scan's `FAIL` findings to an AWS Bedrock model (Claude Haiku by
+default, via `--bedrock-model`) and asks it to identify the single most urgent fix, a short
+executive summary, and a ranked list of the next-most-important fixes. The result is embedded
+as a new section in `report.html` only — there's no standalone summary file and it isn't printed
+to the console — so `--ai-summary` requires `html` to be one of the enabled `--formats` (the CLI
+errors out otherwise, rather than silently spending a Bedrock call on output nobody will see).
+
+This is a best-effort, opt-in layer, not part of the core scan: a Bedrock failure (no model
+access, wrong region, throttling, malformed response) prints a warning and the rest of the
+scan/reports complete normally. Before using it, the target account needs model access enabled
+for the chosen model in the Bedrock console for `--bedrock-region` — that's a one-time,
+per-account/region setting unrelated to IAM. Bedrock model availability is region-specific and
+generally unrelated to which AWS regions are being scanned, hence the separate
+`--bedrock-region` flag (default `us-east-1`).
+
+Deliberate scope choices, so the prompt stays small and the output stays trustworthy:
+- Only `FAIL` findings are sent, ranked by severity and capped at 60 (`MAX_FINDINGS_IN_PROMPT` in
+  `core/bedrock_summary.py`); if more exist, the prompt says so explicitly rather than silently
+  dropping the lowest-severity ones.
+- `ERROR` findings (checks that couldn't be evaluated, e.g. missing permissions) are surfaced
+  only as a count for context — never treated as confirmed issues to prioritize.
+- Each finding's free-form `evidence` dict is excluded from the prompt (no fixed schema across
+  checks; the `title`/`description`/`remediation` text already carries the signal).
+- The model's output is rendered through the same HTML-escaping as every other field in the
+  report — it's untrusted-ish generated text, never inserted as raw/`| safe` HTML.
 
 ## CIS AWS Foundations Benchmark v3.0.0 mapping
 

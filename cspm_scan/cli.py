@@ -24,6 +24,22 @@ def build_parser() -> argparse.ArgumentParser:
         help="Print (or write, with --output) the least-privilege IAM policy for the scanner user and exit",
     )
     parser.add_argument("--output", help="With --print-iam-policy, file path to write the policy JSON to")
+    parser.add_argument(
+        "--ai-summary",
+        action="store_true",
+        help="Use AWS Bedrock to analyze the FAIL findings and embed a prioritized summary in report.html "
+        "(requires 'html' in --formats; best-effort, never fails the scan)",
+    )
+    parser.add_argument(
+        "--bedrock-model",
+        default="us.anthropic.claude-haiku-4-5-20251001-v1:0",
+        help="Bedrock model (or inference profile) ID to use with --ai-summary",
+    )
+    parser.add_argument(
+        "--bedrock-region",
+        default="us-east-1",
+        help="AWS region to call Bedrock in with --ai-summary (independent of --regions, which controls what's scanned)",
+    )
     return parser
 
 
@@ -52,6 +68,12 @@ def main(argv: list[str] | None = None) -> int:
         console.print("[red]--profile is required unless using --print-iam-policy[/red]")
         return 2
 
+    formats = set(args.formats.split(","))
+
+    if args.ai_summary and "html" not in formats:
+        console.print("[red]--ai-summary requires 'html' in --formats (that's the only place it's shown)[/red]")
+        return 2
+
     regions = args.regions.split(",") if args.regions else None
 
     try:
@@ -68,7 +90,23 @@ def main(argv: list[str] | None = None) -> int:
     )
     findings = ScanEngine(ctx).run()
 
-    formats = set(args.formats.split(","))
+    ai_summary = None
+    if args.ai_summary:
+        from cspm_scan.core.bedrock_summary import generate_ai_summary
+
+        try:
+            bedrock_client = session_factory.client("bedrock-runtime", args.bedrock_region)
+            ai_summary = generate_ai_summary(findings, bedrock_client, args.bedrock_model)
+            if ai_summary is None:
+                console.print("[yellow]AI summary skipped: no FAIL findings to summarize[/yellow]")
+        except Exception as e:
+            # Best-effort: a bad --bedrock-region/--bedrock-model, throttling, missing model
+            # access, etc. must never discard the scan that already ran. generate_ai_summary()
+            # itself catches its own errors into BedrockSummaryError, but client construction
+            # above (e.g. botocore.exceptions.InvalidRegionError on a malformed region string)
+            # is outside that boundary, so this catches broadly on purpose.
+            console.print(f"[yellow]AI summary skipped: {e}[/yellow]")
+
     output_dir = Path(args.output_dir)
 
     if "table" in formats:
@@ -87,7 +125,14 @@ def main(argv: list[str] | None = None) -> int:
         from cspm_scan.report.html_report import write_html_report
 
         html_path = output_dir / "report.html"
-        write_html_report(findings, html_path, account_id=ctx.account_id, profile=args.profile, regions=ctx.regions)
+        write_html_report(
+            findings,
+            html_path,
+            account_id=ctx.account_id,
+            profile=args.profile,
+            regions=ctx.regions,
+            ai_summary=ai_summary,
+        )
         console.print(f"HTML report written to {html_path}")
 
     return 0

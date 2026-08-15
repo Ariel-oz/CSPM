@@ -18,6 +18,14 @@
       "Resource": "*"
     },
     {
+      "Sid": "BEDROCKREADONLY",
+      "Effect": "Allow",
+      "Action": [
+        "bedrock:InvokeModel"
+      ],
+      "Resource": "*"
+    },
+    {
       "Sid": "CLOUDTRAILREADONLY",
       "Effect": "Allow",
       "Action": [
